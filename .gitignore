@@ -1,0 +1,21 @@
+# Python - pliki skompilowane (tego nie chcemy w repo)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db
+
+# Pliki tymczasowe wtyczki (np. spakowana wtyczka)
+*.zip
+
+# Pliki środowisk wirtualnych (jeśli będziesz używać)
+venv/
+env/
+.env
+
+# Pliki ustawień edytorów kodu (opcjonalnie - np. VS Code, PyCharm)
+.idea/
+.vscode/
