@@ -38,20 +38,51 @@ from PyQt5.QtWidgets import QAbstractItemView
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'vector_rubber_dockwidget_base.ui'))
 
-
 class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     closingPlugin = pyqtSignal()
 
     def __init__(self, parent=None):
-        """Constructor."""
         super(VectorRubberDockWidget, self).__init__(parent)
-        # Set up the user interface from Designer.
-        # After setupUI you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://doc.qt.io/qt-5/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
+
+        canvas = iface.mapCanvas()
+        self.fill_listWidget_with_layers()
+
+        self.pb_select.clicked.connect(self.select_layers)
+        self.pb_uncheck.clicked.connect(self.uncheck_layers)
+
+        self.pb_confirm_layers.clicked.connect(lambda : self.enable_widget(self.pb_delete_feats))
+        self.pb_delete_feats.clicked.connect(lambda : self.enable_widget(self.pb_save))
+
+    def enable_widget(self, widget):
+        widget.setEnabled(True)
+
+    def fill_listWidget_with_layers(self):
+        self.list_layers.clear()
+
+        for layer in QgsProject.instance().mapLayers().values():
+            if isinstance(layer, QgsVectorLayer):
+
+                item = QListWidgetItem(layer.name())
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
+                self.list_layers.addItem(item)
+            self.list_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+
+    def select_layers(self):
+        for x in range(self.list_layers.count()):
+            item = self.list_layers.item(x)
+            if item.text()== 'fid':
+                item.setCheckState(Qt.Unchecked)
+            else:
+                item.setCheckState(Qt.Checked)
+            
+    def uncheck_layers(self):
+        for x in range(self.list_layers.count()):
+            item = self.list_layers.item(x)
+            item.setCheckState(Qt.Unchecked) 
 
     def closeEvent(self, event):
         self.closingPlugin.emit()
