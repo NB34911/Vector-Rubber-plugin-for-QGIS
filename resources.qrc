@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/vector_rubber" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
