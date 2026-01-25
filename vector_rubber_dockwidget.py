@@ -26,6 +26,7 @@ import os
 
 from qgis.PyQt import QtGui, QtWidgets, uic
 from qgis.PyQt.QtCore import pyqtSignal
+from qgis.gui import QgsMapToolExtent
 
 from qgis.core import *
 import qgis.utils
@@ -46,14 +47,41 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         super(VectorRubberDockWidget, self).__init__(parent)
         self.setupUi(self)
 
-        canvas = iface.mapCanvas()
+        self.rectangle = None
+
         self.fill_listWidget_with_layers()
 
         self.pb_select.clicked.connect(self.select_layers)
         self.pb_uncheck.clicked.connect(self.uncheck_layers)
 
-        self.pb_confirm_layers.clicked.connect(lambda : self.enable_widget(self.pb_delete_feats))
-        self.pb_delete_feats.clicked.connect(lambda : self.enable_widget(self.pb_save))
+        self.pb_confirm_layers.clicked.connect(lambda : self.enable_widget(self.pb_undo))
+        self.pb_confirm_layers.clicked.connect(self.start_map_tool)
+
+        self.pb_undo.clicked.connect(lambda : self.enable_widget(self.pb_save))
+
+    def start_map_tool(self):
+        self.rectangle = None
+        canvas = iface.mapCanvas()
+        self.tool = QgsMapToolExtent(canvas)
+        self.tool.extentChanged.connect(self.select_feats_and_delete)
+        canvas.setMapTool(self.tool)
+        
+    def select_feats_and_delete(self,rect):
+        self.rectangle = rect
+        list_layers_to_modify = []
+        for x in range(self.list_layers.count()):
+            item = self.list_layers.item(x)
+            if item.checkState()==2:
+                list_layers_to_modify.append(item.text())
+
+        for l in list_layers_to_modify:
+            layer = QgsProject.instance().mapLayersByName(l)[0]
+            if not layer.isEditable():
+                layer.startEditing()
+            layer.selectByRect(self.rectangle)
+            layer.deleteSelectedFeatures()
+        #iface.mapCanvas().unsetMapTool(self.tool)
+
 
     def enable_widget(self, widget):
         widget.setEnabled(True)
