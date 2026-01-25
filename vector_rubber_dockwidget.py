@@ -30,7 +30,7 @@ from qgis.gui import QgsMapToolExtent
 
 from qgis.core import *
 import qgis.utils
-from qgis.utils import iface 
+from qgis.utils import iface
 from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QAction
@@ -48,7 +48,9 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.setupUi(self)
 
         self.rectangle = None
-        self.layers_checked = None
+        self.layers_checked = []
+        self.tool = None
+        self.modified_layers_history = []
 
         self.fill_listWidget_with_layers()
 
@@ -65,11 +67,16 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def save_changes_and_finish(self):
         layers = self.layers_checked
-        for l in layers:
-            layer = QgsProject.instance().mapLayersByName(l)[0]
-            layer.commitChanges()
-        iface.mapCanvas().unsetMapTool(self.tool)
-        
+        for layer_id in layers:
+            layer = QgsProject.instance().mapLayer(layer_id)
+            if layer:
+                layer.commitChanges()
+        if self.tool:
+            iface.mapCanvas().unsetMapTool(self.tool)
+
+        self.modified_layers_history.clear()
+        self.pb_undo.setEnabled(False)
+        self.pb_save.setEnabled(False)
         
     def start_map_tool(self):
         self.rectangle = None
@@ -84,20 +91,27 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         canvas = iface.mapCanvas()
         canvas_crs = canvas.mapSettings().destinationCrs()
 
-        self.modified_layers_history = [] 
+        self.modified_layers_history.clear()
 
-        list_layers_to_modify = []
+        list_layers_ids_to_modify = []
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            if item.checkState()==2:
-                list_layers_to_modify.append(item.text())
-        self.layers_checked = list_layers_to_modify
+            if item.checkState()==Qt.Checked:
+                list_layers_ids_to_modify.append(item.data(Qt.UserRole))
 
-        for l in list_layers_to_modify:
-            layer = QgsProject.instance().mapLayersByName(l)[0]
+        self.layers_checked = list_layers_ids_to_modify
+
+        for layer_id in list_layers_ids_to_modify:
+            layer = QgsProject.instance().mapLayer(layer_id)
+
+            if not layer:
+                continue
 
             ct = QgsCoordinateTransform(canvas_crs, layer.crs(), QgsProject.instance())
-            layer_rect = ct.transform(self.rectangle)
+            try:
+                layer_rect = ct.transform(self.rectangle)
+            except:
+                continue
 
             if not layer.isEditable():
                 layer.startEditing()
@@ -105,18 +119,17 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.modified_layers_history.append(layer)
 
             layer.beginEditCommand("Vector Rubber Delete")
+            layer.removeSelection()
             layer.selectByRect(layer_rect)
             layer.deleteSelectedFeatures()
+            layer.removeSelection()
             layer.endEditCommand()
-
-        #iface.mapCanvas().unsetMapTool(self.tool)
 
     def undo_last_operation(self):
         if hasattr(self, 'modified_layers_history'):
             for layer in self.modified_layers_history:
                 layer.undoStack().undo()
             self.modified_layers_history.clear()
-
 
     def enable_widget(self, widget):
         widget.setEnabled(True)
@@ -128,19 +141,16 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             if isinstance(layer, QgsVectorLayer):
 
                 item = QListWidgetItem(layer.name())
+                item.setData(Qt.UserRole, layer.id())
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Unchecked)
                 self.list_layers.addItem(item)
             self.list_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
-
     def select_layers(self):
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            if item.text()== 'fid':
-                item.setCheckState(Qt.Unchecked)
-            else:
-                item.setCheckState(Qt.Checked)
+            item.setCheckState(Qt.Checked)
             
     def uncheck_layers(self):
         for x in range(self.list_layers.count()):
@@ -148,5 +158,7 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             item.setCheckState(Qt.Unchecked) 
 
     def closeEvent(self, event):
+        if self.tool:
+            iface.mapCanvas().unsetMapTool(self.tool)
         self.closingPlugin.emit()
         event.accept()
