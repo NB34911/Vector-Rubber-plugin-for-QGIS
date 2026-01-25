@@ -48,6 +48,7 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.setupUi(self)
 
         self.rectangle = None
+        self.layers_checked = None
 
         self.fill_listWidget_with_layers()
 
@@ -57,8 +58,19 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.pb_confirm_layers.clicked.connect(lambda : self.enable_widget(self.pb_undo))
         self.pb_confirm_layers.clicked.connect(self.start_map_tool)
 
-        self.pb_undo.clicked.connect(lambda : self.enable_widget(self.pb_save))
+        self.pb_confirm_layers.clicked.connect(lambda : self.enable_widget(self.pb_save))
+        self.pb_undo.clicked.connect(self.undo_last_operation)
 
+        self.pb_save.clicked.connect(self.save_changes_and_finish)
+
+    def save_changes_and_finish(self):
+        layers = self.layers_checked
+        for l in layers:
+            layer = QgsProject.instance().mapLayersByName(l)[0]
+            layer.commitChanges()
+        iface.mapCanvas().unsetMapTool(self.tool)
+        
+        
     def start_map_tool(self):
         self.rectangle = None
         canvas = iface.mapCanvas()
@@ -68,19 +80,42 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
     def select_feats_and_delete(self,rect):
         self.rectangle = rect
+
+        canvas = iface.mapCanvas()
+        canvas_crs = canvas.mapSettings().destinationCrs()
+
+        self.modified_layers_history = [] 
+
         list_layers_to_modify = []
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
             if item.checkState()==2:
                 list_layers_to_modify.append(item.text())
+        self.layers_checked = list_layers_to_modify
 
         for l in list_layers_to_modify:
             layer = QgsProject.instance().mapLayersByName(l)[0]
+
+            ct = QgsCoordinateTransform(canvas_crs, layer.crs(), QgsProject.instance())
+            layer_rect = ct.transform(self.rectangle)
+
             if not layer.isEditable():
                 layer.startEditing()
-            layer.selectByRect(self.rectangle)
+
+            self.modified_layers_history.append(layer)
+
+            layer.beginEditCommand("Vector Rubber Delete")
+            layer.selectByRect(layer_rect)
             layer.deleteSelectedFeatures()
+            layer.endEditCommand()
+
         #iface.mapCanvas().unsetMapTool(self.tool)
+
+    def undo_last_operation(self):
+        if hasattr(self, 'modified_layers_history'):
+            for layer in self.modified_layers_history:
+                layer.undoStack().undo()
+            self.modified_layers_history.clear()
 
 
     def enable_widget(self, widget):
