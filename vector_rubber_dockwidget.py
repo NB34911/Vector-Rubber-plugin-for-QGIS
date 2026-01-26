@@ -91,8 +91,6 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         canvas = iface.mapCanvas()
         canvas_crs = canvas.mapSettings().destinationCrs()
 
-        self.modified_layers_history.clear()
-
         list_layers_ids_to_modify = []
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
@@ -100,6 +98,8 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 list_layers_ids_to_modify.append(item.data(Qt.UserRole))
 
         self.layers_checked = list_layers_ids_to_modify
+
+        current_step_layers = []
 
         for layer_id in list_layers_ids_to_modify:
             layer = QgsProject.instance().mapLayer(layer_id)
@@ -116,7 +116,7 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             if not layer.isEditable():
                 layer.startEditing()
 
-            self.modified_layers_history.append(layer)
+            current_step_layers.append(layer)
 
             layer.beginEditCommand("Vector Rubber Delete")
             layer.removeSelection()
@@ -125,11 +125,19 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             layer.removeSelection()
             layer.endEditCommand()
 
+        if current_step_layers:
+            self.modified_layers_history.append(current_step_layers)
+            #self.pb_undo.setEnabled(True) 
+
     def undo_last_operation(self):
-        if hasattr(self, 'modified_layers_history'):
-            for layer in self.modified_layers_history:
+        if self.modified_layers_history:
+            last_step_layers = self.modified_layers_history.pop()
+
+            for layer in last_step_layers:
                 layer.undoStack().undo()
-            self.modified_layers_history.clear()
+                layer.triggerRepaint()
+        #if not self.modified_layers_history:
+        #    self.pb_undo.setEnabled(False)
 
     def enable_widget(self, widget):
         widget.setEnabled(True)
