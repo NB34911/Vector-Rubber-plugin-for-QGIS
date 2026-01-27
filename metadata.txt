@@ -6,16 +6,15 @@ version=1.0.0
 author=Natalia Budzińska
 email=nataliabudzinska348@gmail.com
 about=This plugin allows removing features from multiple vector layers at once.
-tracker=https://
-repository=https://
+tracker=https://github.com/NB34911/Vector-Rubber-plugin-for-QGIS/issues
+repository=https://github.com/NB34911/Vector-Rubber-plugin-for-QGIS
 
 # Recommended items:
 tags=vector, selection, delete, editing, productivity, multi-layer
-homepage=https://
+homepage=https://github.com/NB34911/Vector-Rubber-plugin-for-QGIS
 category=Vector
 icon=icon.svg
 experimental=False
 deprecated=False
 hasProcessingProvider=false
 server=False
-
