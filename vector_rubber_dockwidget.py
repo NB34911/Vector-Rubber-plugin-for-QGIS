@@ -23,18 +23,15 @@
 """
 
 import os
-
 from qgis.PyQt import QtGui, QtWidgets, uic
 from qgis.PyQt.QtCore import pyqtSignal
 from qgis.gui import QgsMapToolExtent
-
 from qgis.core import *
 import qgis.utils
 from qgis.utils import iface
-from PyQt5.QtWidgets import QListWidgetItem
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QAction
-from PyQt5.QtWidgets import QAbstractItemView
+from qgis.PyQt.QtWidgets import QListWidgetItem, QAction, QAbstractItemView
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import QMessageBox
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'vector_rubber_dockwidget_base.ui'))
@@ -85,21 +82,29 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.tool.extentChanged.connect(self.select_feats_and_delete)
         canvas.setMapTool(self.tool)
         
-    def select_feats_and_delete(self,rect):
+    def select_feats_and_delete(self, rect):
         self.rectangle = rect
-
         canvas = iface.mapCanvas()
-        canvas_crs = canvas.mapSettings().destinationCrs()
+        mupp = canvas.mapSettings().mapUnitsPerPixel()
+        if rect.width() < (5 * mupp) and rect.height() < (5 * mupp):
+            QMessageBox.information(
+                self,
+                "Vector Rubber",
+                "Single click detected.\n\n"
+                "To delete features, please click and drag to draw a rectangle over the area."
+            )
+            return
 
+        canvas_crs = canvas.mapSettings().destinationCrs()
         list_layers_ids_to_modify = []
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            if item.checkState()==Qt.Checked:
+            if item.checkState() == Qt.Checked:
                 list_layers_ids_to_modify.append(item.data(Qt.UserRole))
 
         self.layers_checked = list_layers_ids_to_modify
-
         current_step_layers = []
+        total_deleted_count = 0
 
         for layer_id in list_layers_ids_to_modify:
             layer = QgsProject.instance().mapLayer(layer_id)
@@ -112,6 +117,14 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 layer_rect = ct.transform(self.rectangle)
             except:
                 continue
+            
+            req = QgsFeatureRequest().setFilterRect(layer_rect)
+            req.setFlags(QgsFeatureRequest.NoGeometry)
+            
+            ids_to_delete = [f.id() for f in layer.getFeatures(req)]
+            
+            if not ids_to_delete:
+                continue
 
             if not layer.isEditable():
                 layer.startEditing()
@@ -119,25 +132,24 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             current_step_layers.append(layer)
 
             layer.beginEditCommand("Vector Rubber Delete")
-            layer.removeSelection()
-            layer.selectByRect(layer_rect)
-            layer.deleteSelectedFeatures()
-            layer.removeSelection()
+            layer.deleteFeatures(ids_to_delete)
             layer.endEditCommand()
+            total_deleted_count += len(ids_to_delete)
 
         if current_step_layers:
             self.modified_layers_history.append(current_step_layers)
-            #self.pb_undo.setEnabled(True) 
+            self.enable_widget(self.pb_undo)
+
+            iface.messageBar().pushMessage("Vector Rubber", f"Deleted {total_deleted_count} features.", level=3)
+        else:
+            iface.messageBar().pushMessage("Vector Rubber", "No features found in the selected area.", level=3)
 
     def undo_last_operation(self):
         if self.modified_layers_history:
             last_step_layers = self.modified_layers_history.pop()
-
             for layer in last_step_layers:
                 layer.undoStack().undo()
                 layer.triggerRepaint()
-        #if not self.modified_layers_history:
-        #    self.pb_undo.setEnabled(False)
 
     def enable_widget(self, widget):
         widget.setEnabled(True)
@@ -153,7 +165,7 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Unchecked)
                 self.list_layers.addItem(item)
-            self.list_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
     def select_layers(self):
         for x in range(self.list_layers.count()):
