@@ -6,6 +6,8 @@ Vector Rubber is a QGIS plugin designed to quickly delete multiple features from
 
 Working with multiple vector layers usually requires selecting active layers one by one, selecting features, and deleting them individually. **Vector Rubber** streamlines this process by allowing you to define a list of target layers and delete features from all of them at once with a single sweep of the mouse.
 
+![Demo](images/Animation3.gif)
+
 ## Key Features
 
 *   **Multi-layer support:** Select unlimited vector layers to modify simultaneously.
