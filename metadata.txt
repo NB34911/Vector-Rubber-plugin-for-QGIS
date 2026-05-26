@@ -1,8 +1,9 @@
 [general]
 name=Vector Rubber
 qgisMinimumVersion=3.16
+qgisMaximumVersion=4.99
 description=This plugin allows removing features from multiple vector layers at once.
-version=1.0.1
+version=1.0.2
 author=Natalia Budzińska
 email=nataliabudzinska348@gmail.com
 about=This plugin allows removing features from multiple vector layers at once.

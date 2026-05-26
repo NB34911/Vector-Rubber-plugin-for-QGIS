@@ -22,15 +22,29 @@
  ***************************************************************************/
 """
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
-from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtGui import QIcon, QPalette
 from qgis.PyQt.QtWidgets import QAction
 # Initialize Qt resources from file resources.py
-from .resources import *
-
+# from .resources import *
+from qgis.PyQt.QtWidgets import QApplication
 # Import the code for the DockWidget
 from .vector_rubber_dockwidget import VectorRubberDockWidget
 import os.path
+import os
 
+try:
+    # QGIS 4 (PyQt6)
+    WINDOW_ROLE = QPalette.ColorRole.Window
+except AttributeError:
+    # QGIS 3 (PyQt5)
+    WINDOW_ROLE = QPalette.Window
+
+try:
+    LEFT_DOCK_AREA = Qt.DockWidgetArea.LeftDockWidgetArea # QGIS 4 (PyQt6)
+    WINDOW_TEXT_ROLE = QPalette.ColorRole.WindowText # QGIS 4
+except AttributeError:
+    LEFT_DOCK_AREA = Qt.LeftDockWidgetArea                # QGIS 3 (PyQt5)
+    WINDOW_TEXT_ROLE = QPalette.WindowText           # QGIS 3
 
 class VectorRubber:
     """QGIS Plugin Implementation."""
@@ -68,7 +82,6 @@ class VectorRubber:
         self.toolbar = self.iface.addToolBar(u'VectorRubber')
         self.toolbar.setObjectName(u'VectorRubber')
 
-        #print "** INITIALIZING VectorRubber"
 
         self.pluginIsActive = False
         self.dockwidget = None
@@ -166,13 +179,23 @@ class VectorRubber:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
+        
+        plugin_dir = os.path.dirname(__file__)
+        bg_color = self.iface.mainWindow().palette().color(WINDOW_ROLE)
+        
+        if bg_color.lightness() < 128:
+            icon_path = os.path.join(plugin_dir, 'icon_light.svg')
+        else:
+            icon_path = os.path.join(plugin_dir, 'icon_dark.svg')
 
-        icon_path = ':/plugins/vector_rubber/icon.svg'
         self.add_action(
             icon_path,
             text=self.tr(u'Vector Rubber'),
             callback=self.run,
             parent=self.iface.mainWindow())
+
+        # will be set False in run()
+        self.first_start = True
 
     #--------------------------------------------------------------------------
 
@@ -228,5 +251,5 @@ class VectorRubber:
 
             # show the dockwidget
             # TODO: fix to allow choice of dock location
-            self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dockwidget)
+            self.iface.addDockWidget(LEFT_DOCK_AREA, self.dockwidget)
             self.dockwidget.show()

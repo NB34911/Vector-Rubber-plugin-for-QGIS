@@ -33,6 +33,21 @@ from qgis.PyQt.QtWidgets import QListWidgetItem, QAction, QAbstractItemView
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QMessageBox
 
+try:
+    # QGIS 4 (PyQt6)
+    USER_ROLE = Qt.ItemDataRole.UserRole
+    ITEM_IS_CHECKABLE = Qt.ItemFlag.ItemIsUserCheckable
+    CHECKED = Qt.CheckState.Checked
+    UNCHECKED = Qt.CheckState.Unchecked
+    EXTENDED_SELECTION = QAbstractItemView.SelectionMode.ExtendedSelection
+except AttributeError:
+    # QGIS 3 (PyQt5)
+    USER_ROLE = Qt.UserRole
+    ITEM_IS_CHECKABLE = Qt.ItemIsUserCheckable
+    CHECKED = Qt.Checked
+    UNCHECKED = Qt.Unchecked
+    EXTENDED_SELECTION = QAbstractItemView.ExtendedSelection
+
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'vector_rubber_dockwidget_base.ui'))
 
@@ -97,10 +112,11 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         canvas_crs = canvas.mapSettings().destinationCrs()
         list_layers_ids_to_modify = []
+        
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            if item.checkState() == Qt.Checked:
-                list_layers_ids_to_modify.append(item.data(Qt.UserRole))
+            if item.checkState() == CHECKED:
+                list_layers_ids_to_modify.append(item.data(USER_ROLE))
 
         self.layers_checked = list_layers_ids_to_modify
         current_step_layers = []
@@ -136,13 +152,16 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             layer.endEditCommand()
             total_deleted_count += len(ids_to_delete)
 
+            layer.triggerRepaint() 
+
         if current_step_layers:
             self.modified_layers_history.append(current_step_layers)
             self.enable_widget(self.pb_undo)
 
-            iface.messageBar().pushMessage("Vector Rubber", f"Deleted {total_deleted_count} features.", level=3)
+            iface.messageBar().pushMessage("Vector Rubber", f"Deleted {total_deleted_count} features.", level=Qgis.MessageLevel.Success)
         else:
-            iface.messageBar().pushMessage("Vector Rubber", "No features found in the selected area.", level=3)
+            iface.messageBar().pushMessage("Vector Rubber", "No features found in the selected area.", level=Qgis.MessageLevel.Success)
+
 
     def undo_last_operation(self):
         if self.modified_layers_history:
@@ -161,21 +180,21 @@ class VectorRubberDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             if isinstance(layer, QgsVectorLayer):
 
                 item = QListWidgetItem(layer.name())
-                item.setData(Qt.UserRole, layer.id())
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(Qt.Unchecked)
+                item.setData(USER_ROLE, layer.id())
+                item.setFlags(item.flags() | ITEM_IS_CHECKABLE)
+                item.setCheckState(CHECKED)
                 self.list_layers.addItem(item)
-        self.list_layers.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.list_layers.setSelectionMode(EXTENDED_SELECTION)
 
     def select_layers(self):
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            item.setCheckState(Qt.Checked)
+            item.setCheckState(CHECKED)
             
     def uncheck_layers(self):
         for x in range(self.list_layers.count()):
             item = self.list_layers.item(x)
-            item.setCheckState(Qt.Unchecked) 
+            item.setCheckState(UNCHECKED)
 
     def closeEvent(self, event):
         if self.tool:
